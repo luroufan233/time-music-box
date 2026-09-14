@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#0d1324" />
+    <meta name="description" content="时光音盒——基于 Vue.js 的移动端时间与音乐播放器" />
+    <title>时光音盒 · 移动音乐播放器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <main class="phone-layout">
+        <header class="topbar" aria-label="应用顶部导航">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div>
+            <p class="eyebrow">TIME &amp; SOUND</p>
+            <h1>时光音盒</h1>
+          </div>
+          <button class="icon-button" type="button" title="切换主题" aria-label="切换主题" @click="toggleTheme">
+            <span v-if="!isLightTheme">☼</span><span v-else>☾</span>
+          </button>
+        </header>
+
+        <section class="hero-card" aria-labelledby="clock-title">
+          <div class="sun-orbit orbit-one"></div>
+          <div class="sun-orbit orbit-two"></div>
+          <p class="section-label">今天 · {{ greeting }}</p>
+          <h2 id="clock-title" class="clock">{{ timeText }}</h2>
+          <p class="date-line">{{ dateText }} <span class="dot-separator">·</span> {{ weekdayText }}</p>
+          <div class="status-pill"><span class="live-dot"></span> 本地时间实时同步</div>
+        </section>
+
+        <section class="player-card" aria-labelledby="player-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">NOW PLAYING</p>
+              <h2 id="player-title">{{ currentTrack ? currentTrack.name : '准备好你的音乐' }}</h2>
+            </div>
+            <span class="track-counter">{{ currentTrackIndex + 1 }} / {{ playlist.length }}</span>
+          </div>
+
+          <div class="album-art" :class="{ 'is-playing': isPlaying }" aria-hidden="true">
+            <div class="art-glow"></div>
+            <div class="art-disc"><span class="disc-center"></span></div>
+            <span class="art-note note-a">♪</span><span class="art-note note-b">♫</span>
+          </div>
+
+          <div class="track-meta">
+            <span class="genre-tag">{{ currentTrack ? currentTrack.type : 'MP3 AUDIO' }}</span>
+            <p class="track-hint">{{ currentTrack ? currentTrack.source : '从手机选择一首 MP3，开启专注时刻' }}</p>
+          </div>
+
+          <div class="progress-block">
+            <input class="range progress-range" type="range" min="0" :max="duration || 0" step="0.1" :value="currentTime" aria-label="播放进度" @input="seek" />
+            <div class="time-row"><span>{{ formatTime(currentTime) }}</span><span>{{ formatTime(duration) }}</span></div>
+          </div>
+
+          <div class="player-controls" aria-label="播放控制">
+            <button class="control-button secondary" type="button" title="上一首" aria-label="上一首" @click="previousTrack">↶</button>
+            <button class="play-button" type="button" :title="isPlaying ? '暂停' : '播放'" :aria-label="isPlaying ? '暂停' : '播放'" @click="togglePlay">
+              <span v-if="!isPlaying">▶</span><span v-else>Ⅱ</span>
+            </button>
+            <button class="control-button secondary" type="button" title="下一首" aria-label="下一首" @click="nextTrack">↷</button>
+          </div>
+
+          <div class="volume-row">
+            <span class="volume-icon" aria-hidden="true">⌁</span>
+            <input class="range volume-range" type="range" min="0" max="1" step="0.01" v-model.number="volume" aria-label="音量" @input="changeVolume" />
+            <span class="volume-value">{{ Math.round(volume * 100) }}%</span>
+          </div>
+
+          <audio ref="audio" @timeupdate="syncTime" @loadedmetadata="syncDuration" @ended="handleEnded" @play="isPlaying = true" @pause="isPlaying = false"></audio>
+        </section>
+
+        <section class="playlist-section" aria-labelledby="playlist-title">
+          <div class="section-heading playlist-heading">
+            <div><p class="section-label">MY LIBRARY</p><h2 id="playlist-title">播放列表</h2></div>
+            <label class="import-button" title="选择 MP3 文件">
+              <input type="file" accept="audio/mpeg,audio/mp3,audio/*" multiple @change="importTracks" />
+              <span>＋ 添加音乐</span>
+            </label>
+          </div>
+
+          <div v-if="playlist.length" class="playlist" role="list">
+            <article v-for="(track, index) in playlist" :key="track.id" class="track-item" :class="{ active: currentTrackIndex === index }" role="listitem" @click="selectTrack(index)">
+              <div class="track-number"><span v-if="currentTrackIndex === index && isPlaying" class="equalizer"><i></i><i></i><i></i></span><span v-else>{{ String(index + 1).padStart(2, '0') }}</span></div>
+              <div class="track-info"><strong>{{ track.name }}</strong><small>{{ track.source }} · {{ formatTime(track.duration) }}</small></div>
+              <button class="more-button" type="button" title="删除歌曲" :aria-label="`删除 ${track.name}`" @click.stop="removeTrack(index)">···</button>
+            </article>
+          </div>
+          <div v-else class="empty-state">
+            <div class="empty-icon">♫</div>
+            <h3>播放列表还是空的</h3>
+            <p>点击“添加音乐”，选择手机中的 MP3 文件即可播放。</p>
+          </div>
+        </section>
+
+        <footer class="app-footer"><span>Vue.js · HTML5 · CSS3</span><span>为每一个当下留一段声音</span></footer>
+      </main>
+      <div v-if="toastMessage" class="toast" role="status">{{ toastMessage }}</div>
+    </div>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
